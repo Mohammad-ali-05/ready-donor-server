@@ -33,12 +33,57 @@ async function run() {
         await client.connect();
         console.log("✅ Connected to MongoDB");
         //DB
-        const db = client.db("readyDonor");
+        const db = client.db("readyDonorDB");
         //Collections
+        const districtCollection = db.collection("district");
+        const upazilaCollection = db.collection("upazila");
         const usersCollection = db.collection("user");
 
         app.get("/", (req, res) => {
             res.send("Hello from ready donor server");
+        });
+
+        // Location API's
+        // District API
+        app.get("/api/district", async (req, res) => {
+            try {
+                const { divisionId } = req.query;
+
+                if (!divisionId) {
+                    res.status(400).send({ error: "Bad Request" });
+                }
+
+                const result = await districtCollection
+                    .find({ division_id: divisionId })
+                    .sort({ id: 1 })
+                    .toArray();
+
+                res.status(200).send(result);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ error: "Internal Server Error" });
+            }
+        });
+
+        // Upazila
+        app.get("/api/upazila", async (req, res) => {
+            try {
+                const { districtId } = req.query;
+
+                if (!districtId) {
+                    res.status(400).send({ error: "Bad Request" });
+                }
+
+                const result = await upazilaCollection
+                    .find({ district_id: districtId })
+                    .sort({ id: 1 })
+                    .toArray();
+
+                res.status(200).send(result);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ error: "Internal Server Error" });
+            }
         });
     } finally {
         // Ensures that the client will close when you finish/error
