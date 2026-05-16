@@ -1,2 +1,5 @@
 .env
 node_modules
+ready-donor-firebase-admin-sdk.json
+# File that encoded smart-deals-firebase-admin-sdk.json
+encoder.js

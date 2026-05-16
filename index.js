@@ -5,6 +5,16 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 require("dotenv").config();
 const port = process.env.PORT || 3000;
 
+/* Firebase admin SDk */
+const admin = require("firebase-admin");
+const decoded = Buffer.from(process.env.FIREBASE_ADMIN_KEY, "base64").toString(
+    "utf-8",
+);
+const serviceAccount = JSON.parse(decoded);
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+});
+
 //Middleware
 app.use(express.json());
 app.use(cors());
@@ -16,6 +26,28 @@ app.use((req, res, next) => {
     );
     next();
 });
+
+// Verify Firebase token
+const verifyFirebaseToken = async (req, res, next) => {
+    /* If header is not available send error status and message */
+    if (!req.headers.authorization) {
+        return res.status(401).send({ message: "Unauthorized access" });
+    }
+    /* Getting the token */
+    const token = req.headers.authorization.split(" ")[1];
+    /* If token is not available send error status and message */
+    if (!token) {
+        return res.status(401).send({ message: "Unauthorized access" });
+    }
+
+    try {
+        const userInfo = await admin.auth().verifyIdToken(token);
+        req.tokenEmail = userInfo.email;
+        next();
+    } catch {
+        return res.status(401).send({ message: "Unauthorized access" });
+    }
+};
 
 // mongodb
 const uri = process.env.MONGODB_URI;
