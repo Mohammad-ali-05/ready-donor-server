@@ -43,6 +43,7 @@ const verifyFirebaseToken = async (req, res, next) => {
     try {
         const userInfo = await admin.auth().verifyIdToken(token);
         req.tokenEmail = userInfo.email;
+        req.tokenUid = userInfo.uid;
         next();
     } catch {
         return res.status(401).send({ message: "Unauthorized access" });
@@ -112,6 +113,106 @@ async function run() {
                     .toArray();
 
                 res.status(200).send(result);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ error: "Internal Server Error" });
+            }
+        });
+
+        /* User API' */
+        // Post a user
+        app.post("/api/user", verifyFirebaseToken, async (req, res) => {
+            try {
+                // Destructure user data
+                const {
+                    uid,
+                    email,
+                    name,
+                    image,
+                    bloodGroup,
+                    divisionName,
+                    divisionId,
+                    districtName,
+                    districtId,
+                    upazilaName,
+                    upazilaId,
+                    status,
+                    role,
+                    createdAt,
+                    updatedAt,
+                } = req.body;
+
+                // Token data
+                const tokenEmail = req.tokenEmail;
+                const tokenUid = req.tokenUid;
+
+                // Checking if token user and request user matches
+                if (email !== tokenEmail || uid !== tokenUid) {
+                    return res
+                        .status(403)
+                        .send({ message: "Forbidden access" });
+                }
+
+                // Checking if all value exist
+                if (
+                    !uid ||
+                    !email ||
+                    !name ||
+                    !image ||
+                    !bloodGroup ||
+                    !divisionName ||
+                    !divisionId ||
+                    !districtName ||
+                    !districtId ||
+                    !upazilaName ||
+                    !upazilaId ||
+                    !status ||
+                    !role ||
+                    !createdAt ||
+                    !updatedAt
+                ) {
+                    return res.status(400).send({ message: "Bad Request" });
+                }
+
+                // checking status and role send by the client
+                if (role !== "donor" || status !== "active") {
+                    return res.status(400).send({ message: "Bad Request" });
+                }
+
+                // Checking if user exist with this email
+                const doesUserExists = await usersCollection.findOne({
+                    email: email,
+                });
+
+                // Set user schema
+                const userData = {
+                    uid,
+                    email,
+                    name,
+                    image,
+                    bloodGroup,
+                    divisionName,
+                    divisionId,
+                    districtName,
+                    districtId,
+                    upazilaName,
+                    upazilaId,
+                    status,
+                    role,
+                    createdAt,
+                    updatedAt,
+                };
+
+                if (!doesUserExists) {
+                    // If user does not exist save it database
+                    const result = await usersCollection.insertOne(userData);
+
+                    res.status(201).send(result);
+                } else {
+                    res.status(409).send({
+                        message: "Account already exist",
+                    });
+                }
             } catch (error) {
                 console.log(error);
                 res.status(500).json({ error: "Internal Server Error" });
