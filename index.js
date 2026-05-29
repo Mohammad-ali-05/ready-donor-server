@@ -120,6 +120,21 @@ async function run() {
         });
 
         /* User API' */
+        // Get user by uid
+        app.get("/api/user", verifyFirebaseToken, async (req, res) => {
+            try {
+                /* Firebase uid */
+                const uid = req.tokenUid;
+
+                /* Getting user using uid */
+                const result = await usersCollection.findOne({ uid: uid });
+                res.status(201).send(result);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ error: "Internal Server Error" });
+            }
+        });
+
         // Post a user
         app.post("/api/user", verifyFirebaseToken, async (req, res) => {
             try {
