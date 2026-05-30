@@ -82,6 +82,14 @@ const verifyUserRole = (allowedRoles = [], userCollectionCheck) => {
     };
 };
 
+// Verify user status
+const verifiedUserStatus = (req, res, next) => {
+    if (user.status === "blocked") {
+        return res.status(403).send({ message: "User blocked" });
+    }
+    next();
+};
+
 // mongodb
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -268,6 +276,33 @@ async function run() {
         });
 
         // Blood donation API's
+        // Get latest three donation per user
+        app.get(
+            "/api/blood-donation/latest",
+            verifyFirebaseToken,
+            async (req, res) => {
+                try {
+                    const uid = req.tokenUid;
+
+                    console.log(uid);
+
+                    const result = await bloodDonationCollection
+                        .find({
+                            uid: uid,
+                        })
+                        .sort({ createdAt: 1 })
+                        .limit(3)
+                        .toArray();
+
+                    res.status(200).send(result);
+                    console.log(result);
+                } catch (error) {
+                    console.log(error);
+                    res.status(500).json({ error: "Internal Server Error" });
+                }
+            },
+        );
+
         // Create donation request
         app.post(
             "/api/blood-donation",
