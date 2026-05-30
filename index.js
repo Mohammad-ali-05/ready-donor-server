@@ -50,6 +50,38 @@ const verifyFirebaseToken = async (req, res, next) => {
     }
 };
 
+// Verify user role from mongodb user
+const verifyUserRole = (allowedRoles = [], userCollectionCheck) => {
+    return async (req, res, next) => {
+        try {
+            const uid = req.tokenUid;
+
+            const user = await userCollectionCheck.findOne({ uid });
+
+            if (!user) {
+                return res.status(404).send({ message: "User not found" });
+            }
+
+            if (!allowedRoles.includes(user.role)) {
+                return res.status(403).send({ message: "Forbidden" });
+            }
+
+            if (
+                user.email !== req.tokenEmail ||
+                user.email !== req.body?.requesterEmail
+            ) {
+                return res.status(403).send({ message: "Forbidden" });
+            }
+
+            // attach full user object
+            req.user = user;
+            next();
+        } catch (err) {
+            return res.status(500).send({ message: "Server error" });
+        }
+    };
+};
+
 // mongodb
 const uri = process.env.MONGODB_URI;
 const client = new MongoClient(uri, {
@@ -71,6 +103,7 @@ async function run() {
         const districtCollection = db.collection("district");
         const upazilaCollection = db.collection("upazila");
         const usersCollection = db.collection("user");
+        const bloodDonationCollection = db.collection("bloodDonation");
 
         app.get("/", (req, res) => {
             res.send("Hello from ready donor server");
@@ -214,8 +247,8 @@ async function run() {
                     upazilaId,
                     status,
                     role,
-                    createdAt,
-                    updatedAt,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
                 };
 
                 if (!doesUserExists) {
@@ -233,6 +266,92 @@ async function run() {
                 res.status(500).json({ error: "Internal Server Error" });
             }
         });
+
+        // Blood donation API's
+        // Create donation request
+        app.post(
+            "/api/blood-donation",
+            verifyFirebaseToken,
+            verifyUserRole(["donor", "admin"], usersCollection),
+            async (req, res) => {
+                try {
+                    // User token reference
+                    const uid = req.tokenUid;
+
+                    // Destructuring all the data
+                    const {
+                        requesterName,
+                        requesterEmail,
+                        recipientName,
+                        bloodGroup,
+                        divisionId,
+                        divisionName,
+                        districtId,
+                        districtName,
+                        upazilaId,
+                        upazilaName,
+                        hospitalName,
+                        fullAddress,
+                        donationDate,
+                        donationTime,
+                        requestMessage,
+                    } = req.body;
+
+                    // Checking if all the data exist
+                    if (
+                        !requesterName ||
+                        !requesterEmail ||
+                        !recipientName ||
+                        !bloodGroup ||
+                        !divisionId ||
+                        !divisionName ||
+                        !districtId ||
+                        !districtName ||
+                        !upazilaId ||
+                        !upazilaName ||
+                        !hospitalName ||
+                        !fullAddress ||
+                        !donationDate ||
+                        !donationTime ||
+                        !requestMessage
+                    ) {
+                        return res.status(400).send({
+                            message: "Missing required fields",
+                        });
+                    }
+
+                    // final donation object
+                    const donationData = {
+                        uid,
+                        requesterName,
+                        requesterEmail,
+                        recipientName,
+                        bloodGroup,
+                        divisionId,
+                        divisionName,
+                        districtId,
+                        districtName,
+                        upazilaId,
+                        upazilaName,
+                        hospitalName,
+                        fullAddress,
+                        donationDate,
+                        donationTime,
+                        requestMessage,
+                        status: "pending",
+                        createdAt: new Date(),
+                    };
+
+                    const result =
+                        await bloodDonationCollection.insertOne(donationData);
+
+                    res.status(201).send(result);
+                } catch (error) {
+                    console.log(error);
+                    res.status(500).json({ error: "Internal Server Error" });
+                }
+            },
+        );
     } finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
